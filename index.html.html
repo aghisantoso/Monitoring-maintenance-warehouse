@@ -1,0 +1,1256 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Warehouse Maintenance - PT. Tribina Jaya Sukses</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #F1F5F9; color: #1E293B; }
+  </style>
+</head>
+<body class="min-h-screen py-5 px-4">
+  <div class="max-w-4xl mx-auto space-y-5">
+    <!-- Header -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div class="bg-[#1E3A5F] px-6 py-5 text-white flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p class="text-xs uppercase tracking-wider text-slate-200 font-medium">PT. Tribina Jaya Sukses • Logistic &amp; Warehouse Dept.</p>
+          <h1 class="text-lg sm:text-xl font-bold mt-1">MONITORING MAINTENANCE GUDANG BASAH &amp; KERING</h1>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <button id="refreshCloudBtn" type="button" class="hidden inline-flex items-center gap-1.5 text-xs bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-300/30 px-3 py-1.5 rounded-full transition" title="Tarik data terbaru dari Google Sheets">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Sync
+          </button>
+          <button id="openSyncModalBtn" type="button" class="inline-flex items-center gap-1.5 text-xs bg-white/15 hover:bg-white/25 px-3 py-1.5 rounded-full transition">
+            <span id="syncStatusDot" class="w-2 h-2 rounded-full bg-amber-400"></span>
+            <span id="syncStatusText">Atur Sync Tim</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <div class="flex flex-wrap border-b border-slate-200 bg-slate-50">
+        <button id="tabPengajuanBtn" type="button" class="flex-1 py-3 px-3 text-xs sm:text-sm font-semibold border-b-2 border-[#1E3A5F] text-[#1E3A5F] bg-white flex items-center justify-center gap-1.5">
+          <i data-lucide="clipboard-list" class="w-4 h-4"></i> Pengajuan (<span id="countBadge">5</span>)
+        </button>
+        <button id="tabChecklistBtn" type="button" class="flex-1 py-3 px-3 text-xs sm:text-sm font-medium text-slate-600 hover:bg-white/60 flex items-center justify-center gap-1.5">
+          <i data-lucide="check-square" class="w-4 h-4"></i> Checklist Maintenance
+        </button>
+        <button id="tabExportBtn" type="button" class="flex-1 py-3 px-3 text-xs sm:text-sm font-medium text-slate-600 hover:bg-white/60 flex items-center justify-center gap-1.5">
+          <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Riwayat &amp; Ekspor
+        </button>
+      </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toastBox" class="hidden rounded-xl px-4 py-3 text-sm font-medium shadow-sm border"></div>
+
+    <!-- TAB 1: PENGAJUAN MAINTENANCE -->
+    <div id="panelPengajuan" class="space-y-5">
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+          <p class="text-xs text-slate-500 font-medium">Total Pengajuan</p>
+          <p id="kpiTotal" class="text-2xl font-bold text-[#1E3A5F] mt-1">5</p>
+        </div>
+        <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+          <p class="text-xs text-slate-500 font-medium">In-Progress</p>
+          <p id="kpiProgress" class="text-2xl font-bold text-amber-600 mt-1">2</p>
+        </div>
+        <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+          <p class="text-xs text-slate-500 font-medium">Pengajuan</p>
+          <p id="kpiPengajuan" class="text-2xl font-bold text-blue-600 mt-1">1</p>
+        </div>
+        <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+          <p class="text-xs text-slate-500 font-medium">Selesai</p>
+          <p id="kpiSelesai" class="text-2xl font-bold text-emerald-700 mt-1">2</p>
+        </div>
+      </div>
+
+      <form id="pengajuanForm" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
+        <h2 class="text-base font-bold text-[#1E3A5F]">Tambah Pengajuan / Update Maintenance</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Tgl Pengajuan *</label>
+            <input id="fTgl" type="date" required class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Gudang *</label>
+            <select id="fGudang" required class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 bg-white">
+              <option value="Gudang Basah">Gudang Basah</option>
+              <option value="Gudang Kering">Gudang Kering</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Urgensi *</label>
+            <select id="fUrgensi" required class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 bg-white">
+              <option value="High">High</option>
+              <option value="Medium">Medium</option>
+              <option value="Low">Low</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Item / Area *</label>
+            <input id="fItem" type="text" required placeholder="Contoh: Pergantian Ventilator CS" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Diajukan Oleh *</label>
+            <input id="fOleh" type="text" required placeholder="Contoh: Marisa / Aghi Santoso" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Status Progress *</label>
+            <select id="fStatus" required class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 bg-white">
+              <option value="Pengajuan">Pengajuan</option>
+              <option value="Pending Approval">Pending Approval</option>
+              <option value="In-Progress">In-Progress</option>
+              <option value="Selesai">Selesai</option>
+              <option value="Dibatalkan">Dibatalkan</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Detail Masalah / Pekerjaan *</label>
+            <input id="fDetail" type="text" required placeholder="Jelaskan kondisi atau kendala..." class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Target Selesai</label>
+            <input id="fTarget" type="date" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300" />
+          </div>
+        </div>
+
+        <div class="space-y-2.5 pt-1">
+          <label class="block text-xs font-semibold text-slate-700">Foto Dokumentasi (Otomatis dikompres agar ringan)</label>
+          <div class="flex flex-wrap gap-2.5">
+            <label class="cursor-pointer inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1E3A5F] hover:bg-slate-800 text-white text-xs sm:text-sm font-medium transition">
+              <i data-lucide="camera" class="w-4 h-4"></i> Ambil Foto / Pilih File
+              <input id="cameraFileInput" type="file" accept="image/*" capture="environment" class="hidden" />
+            </label>
+            <button id="openWebcamBtn" type="button" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-[#1E3A5F] text-[#1E3A5F] hover:bg-slate-100 text-xs sm:text-sm font-medium transition">
+              <i data-lucide="video" class="w-4 h-4"></i> Buka Kamera Langsung
+            </button>
+          </div>
+
+          <div id="webcamContainer" class="hidden space-y-2 p-3 rounded-xl bg-slate-50 border border-slate-200">
+            <video id="webcamVideo" autoplay playsinline class="w-full max-h-64 rounded-lg bg-black object-cover"></video>
+            <div class="flex gap-2">
+              <button id="captureBtn" type="button" class="px-4 py-1.5 rounded-lg bg-emerald-700 text-white text-xs font-semibold">Jepret Foto</button>
+              <button id="closeWebcamBtn" type="button" class="px-4 py-1.5 rounded-lg border border-slate-300 bg-white text-xs font-medium">Tutup</button>
+            </div>
+            <canvas id="captureCanvas" class="hidden"></canvas>
+          </div>
+
+          <div id="photoPreviewBox" class="hidden p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+            <div class="flex items-center justify-between">
+              <span id="photoNameLabel" class="text-xs font-medium text-slate-600 truncate"></span>
+              <button id="removePhotoBtn" type="button" class="text-xs text-red-600 hover:underline font-medium">Hapus Foto</button>
+            </div>
+            <img id="photoPreviewImg" src="" alt="Preview Foto" class="max-h-56 w-auto rounded-lg border border-slate-200" />
+          </div>
+        </div>
+
+        <button type="submit" class="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#1E3A5F] hover:bg-slate-800 text-white text-sm font-semibold transition">
+          <i data-lucide="save" class="w-4 h-4"></i> Simpan Pengajuan
+        </button>
+      </form>
+    </div>
+
+    <!-- TAB 2: CHECKLIST MAINTENANCE -->
+    <div id="panelChecklist" class="hidden bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-5">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 class="text-base font-bold text-[#1E3A5F]">Checklist Maintenance Mingguan</h2>
+          <p class="text-xs text-slate-500">Catat tanggal realisasi per Week beserta foto, lalu simpan ke riwayat ekspor Excel.</p>
+        </div>
+        <select id="checklistSelector" class="px-3 py-2 text-sm rounded-lg border border-slate-300 bg-white font-medium">
+          <option value="cs">Checklist Cold Storage (14 Item)</option>
+          <option value="gk">Checklist Gudang Kering (15 Item)</option>
+        </select>
+      </div>
+
+      <!-- Form Checklist Mingguan -->
+      <form id="checklistForm" class="space-y-4">
+        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Bulan Jadwal *</label>
+              <input id="chkMonth" type="month" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 bg-white" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Pilih Jadwal Week *</label>
+              <select id="chkWeek" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 bg-white"></select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Plan Mulai (Bisa Edit)</label>
+              <input id="chkPlanStart" type="date" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 bg-white" />
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">PIC Teknisi *</label>
+              <input id="chkPic" type="text" required placeholder="Nama teknisi" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 bg-white" />
+            </div>
+            <div class="sm:col-span-2">
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Catatan / Tindak Lanjut</label>
+              <input id="chkCatatan" type="text" placeholder="Opsional..." class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 bg-white" />
+            </div>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="flex flex-wrap items-center gap-2">
+            <label class="cursor-pointer inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-[#1E3A5F] hover:bg-slate-800 text-white text-xs font-medium">
+              <i data-lucide="camera" class="w-4 h-4"></i> Foto Checklist (Kamera)
+              <input id="chkCameraInput" type="file" accept="image/*" capture="environment" class="hidden" />
+            </label>
+            <button id="openChkWebcamBtn" type="button" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#1E3A5F] text-[#1E3A5F] hover:bg-slate-100 text-xs font-medium transition">
+              <i data-lucide="video" class="w-4 h-4"></i> Kamera Langsung
+            </button>
+            <span id="chkPhotoLabel" class="text-xs text-slate-600"></span>
+          </div>
+          <button id="selectAllChkBtn" type="button" class="text-xs font-semibold text-[#1E3A5F] hover:underline">Pilih Semua Item</button>
+        </div>
+
+        <div id="checklistItemsBox" class="space-y-2 max-h-80 overflow-y-auto pr-1"></div>
+
+        <button type="submit" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-semibold">
+          <i data-lucide="check-circle" class="w-4 h-4"></i> Simpan Realisasi Checklist
+        </button>
+      </form>
+    </div>
+
+    <!-- TAB 3: RIWAYAT & EKSPOR -->
+    <div id="panelExport" class="hidden bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-5">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 class="text-base font-bold text-[#1E3A5F]">Riwayat, Update Status &amp; Ekspor</h2>
+          <p class="text-xs text-slate-500">Ubah status pengajuan langsung, isi realisasi teknisi, atau ekspor ke Excel (.xlsx).</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button id="exportCsvBtn" type="button" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold transition">
+            <i data-lucide="download" class="w-4 h-4"></i> Ekspor Excel
+          </button>
+          <button id="clearHistoryBtn" type="button" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-xs font-medium transition">
+            <i data-lucide="trash-2" class="w-4 h-4"></i> Bersihkan
+          </button>
+        </div>
+      </div>
+
+      <!-- Sub-filter Riwayat -->
+      <div class="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+        <button id="histTabPengajuan" type="button" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#1E3A5F] text-white">Pengajuan (<span id="histCountP">0</span>)</button>
+        <button id="histTabChecklist" type="button" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-700">Checklist Mingguan (<span id="histCountC">0</span>)</button>
+      </div>
+
+      <div id="recordsList" class="space-y-3"></div>
+    </div>
+  </div>
+
+  <!-- MODAL PENGATURAN SYNC GOOGLE SHEETS -->
+  <div id="syncModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-200 pb-3">
+        <div>
+          <h3 class="text-base font-bold text-[#1E3A5F]">Sync Tim Real-Time via Google Sheets</h3>
+          <p class="text-xs text-slate-500">Hubungkan ke 1 Google Sheet bersama agar semua anggota tim bisa melihat &amp; meng-update data.</p>
+        </div>
+        <button id="closeSyncModalBtn" type="button" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="space-y-2">
+        <label class="block text-xs font-semibold text-slate-700">URL Web App Google Apps Script</label>
+        <div class="flex flex-col sm:flex-row gap-2">
+          <input id="gasUrlInput" type="url" placeholder="https://script.google.com/macros/s/.../exec" class="flex-1 px-3 py-2 text-sm rounded-lg border border-slate-300" />
+          <button id="saveGasUrlBtn" type="button" class="px-4 py-2 rounded-lg bg-[#1E3A5F] hover:bg-slate-800 text-white text-xs font-semibold shrink-0">Simpan &amp; Tarik Data</button>
+        </div>
+        <div class="flex flex-wrap gap-2 pt-1">
+          <button id="pushAllToCloudBtn" type="button" class="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold">Kirim Semua Data Lokal ke Cloud</button>
+          <button id="disconnectGasBtn" type="button" class="px-3 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-xs font-medium">Putuskan Koneksi</button>
+        </div>
+      </div>
+
+      <div class="border-t border-slate-200 pt-3 space-y-2">
+        <label class="block text-xs font-semibold text-slate-700">PIN Izin Hapus &amp; Bersihkan (Default: 1234)</label>
+        <div class="flex gap-2">
+          <input id="adminPinInput" type="password" placeholder="PIN baru..." class="flex-1 px-3 py-2 text-sm rounded-lg border border-slate-300" />
+          <button id="saveAdminPinBtn" type="button" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-800 text-white text-xs font-semibold shrink-0">Simpan PIN</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL KONFIRMASI HAPUS / BERSIHKAN -->
+  <div id="confirmModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-sm w-full p-5 space-y-3">
+      <h3 class="text-sm font-bold text-[#1E3A5F]">Izin Hapus Data</h3>
+      <p id="confirmMessage" class="text-xs sm:text-sm text-slate-600"></p>
+      <div class="space-y-1">
+        <label class="block text-xs font-semibold text-slate-700">Masukkan PIN Izin Admin *</label>
+        <input id="confirmPinInput" type="password" placeholder="Masukkan PIN..." class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300" />
+        <p id="confirmPinError" class="hidden text-xs text-red-600 font-medium"></p>
+      </div>
+      <div class="flex justify-end gap-2 pt-1">
+        <button id="confirmCancelBtn" type="button" class="px-3.5 py-2 rounded-lg border border-slate-300 text-xs font-medium text-slate-700 hover:bg-slate-50">Batal</button>
+        <button id="confirmOkBtn" type="button" class="px-3.5 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold">Verifikasi &amp; Hapus</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL KAMERA LANGSUNG (REALISASI) -->
+  <div id="liveCamModal" class="hidden fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-md w-full p-4 space-y-3">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-bold text-[#1E3A5F]">Kamera Langsung - Foto Hasil</h3>
+        <button id="liveCamCloseBtn" type="button" class="px-2.5 py-1 rounded-lg border border-slate-300 text-xs font-medium text-slate-600 hover:bg-slate-100">Tutup</button>
+      </div>
+      <video id="liveCamVideo" autoplay playsinline class="w-full max-h-72 rounded-xl bg-black object-cover"></video>
+      <canvas id="liveCamCanvas" class="hidden"></canvas>
+      <button id="liveCamCaptureBtn" type="button" class="w-full py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-semibold">Jepret &amp; Simpan Foto</button>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'tribina_warehouse_maint_v2';
+    const GAS_URL_KEY = 'tribina_warehouse_gas_url';
+    const CUSTOM_WEEKS_KEY = 'tribina_custom_week_plans_v1';
+    const ADMIN_PIN_KEY = 'tribina_admin_pin_v1';
+    let adminPin = '1234';
+    try { adminPin = localStorage.getItem(ADMIN_PIN_KEY) || '1234'; } catch (e) { adminPin = '1234'; }
+    const BULAN_INDO = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+    let customWeekPlans = {};
+    try { customWeekPlans = JSON.parse(localStorage.getItem(CUSTOM_WEEKS_KEY) || '{}'); } catch (e) { customWeekPlans = {}; }
+
+    function pad2(n) { return String(n).padStart(2, '0'); }
+
+    function getWeeksForMonth(monthStr) {
+      if (!monthStr || !monthStr.includes('-')) return [];
+      const [yStr, mStr] = monthStr.split('-');
+      const y = parseInt(yStr, 10);
+      const m = parseInt(mStr, 10);
+      const daysInMonth = new Date(y, m, 0).getDate();
+      const ranges = [
+        { name: 'Week 1', s: 1, e: 7 },
+        { name: 'Week 2', s: 8, e: 14 },
+        { name: 'Week 3', s: 15, e: 21 },
+        { name: 'Week 4', s: 22, e: Math.min(28, daysInMonth) },
+      ];
+      if (daysInMonth > 28) ranges.push({ name: 'Week 5', s: 29, e: daysInMonth });
+      return ranges.map((r) => {
+        const key = `${monthStr}|${r.name}`;
+        const defStart = `${yStr}-${pad2(m)}-${pad2(r.s)}`;
+        const defEnd = `${yStr}-${pad2(m)}-${pad2(r.e)}`;
+        const saved = customWeekPlans[key];
+        return {
+          name: r.name,
+          start: (saved && saved.start) || defStart,
+          end: (saved && saved.end) || defEnd,
+        };
+      });
+    }
+
+    function formatShortRange(startStr, endStr) {
+      if (!startStr || !endStr) return startStr || endStr || '';
+      const [y1, m1, d1] = startStr.split('-');
+      const [y2, m2, d2] = endStr.split('-');
+      const b1 = BULAN_INDO[parseInt(m1, 10) - 1] || m1;
+      const b2 = BULAN_INDO[parseInt(m2, 10) - 1] || m2;
+      if (y1 === y2 && m1 === m2) return `${d1}-${d2} ${b1} ${y1}`;
+      return `${d1} ${b1}-${d2} ${b2} ${y2}`;
+    }
+
+    function renderWeekOptions(preserveSelected = true) {
+      const monthEl = document.getElementById('chkMonth');
+      const weekEl = document.getElementById('chkWeek');
+      const startEl = document.getElementById('chkPlanStart');
+      const monthStr = monthEl.value || new Date().toISOString().slice(0, 7);
+      const prevVal = preserveSelected ? weekEl.value : '';
+      const weeks = getWeeksForMonth(monthStr);
+      weekEl.innerHTML = weeks.map((w) => `<option value="${w.name}">${w.name} (${formatShortRange(w.start, w.end)})</option>`).join('');
+      if (prevVal && weeks.some((w) => w.name === prevVal)) weekEl.value = prevVal;
+      const active = weeks.find((w) => w.name === weekEl.value) || weeks[0];
+      if (active) {
+        startEl.value = active.start;
+      }
+    }
+
+    function saveEditedWeekPlan() {
+      const monthStr = document.getElementById('chkMonth').value;
+      const weekName = document.getElementById('chkWeek').value;
+      const start = document.getElementById('chkPlanStart').value;
+      if (!monthStr || !weekName) return;
+      const weeks = getWeeksForMonth(monthStr);
+      const cur = weeks.find((w) => w.name === weekName);
+      const end = cur ? cur.end : start;
+      customWeekPlans[`${monthStr}|${weekName}`] = { start, end: end < start ? start : end };
+      try { localStorage.setItem(CUSTOM_WEEKS_KEY, JSON.stringify(customWeekPlans)); } catch (e) {}
+      renderWeekOptions(true);
+    }
+
+    const INITIAL_RECORDS = [
+      { id: 1, tgl: '2026-11-02', kategori: 'Urgent', item: 'Pergantian Ventilator CS', detail: 'Penggantian Ventilator karena udara masuk sehingga ada bunga es', urgensi: 'High', oleh: 'Marisa', gudang: 'Gudang Basah', status: 'In-Progress', target: '2026-11-13', catatan: 'Barang Sudah Datang, Jadwal akan di kerjakan Jumat 13 Nov 2026', photoName: '', photoDataUrl: '' },
+      { id: 2, tgl: '2026-11-02', kategori: 'Urgent', item: 'Kunci L 12mm', detail: 'Untuk Maintenace CS', urgensi: 'High', oleh: 'Marisa', gudang: 'Gudang Basah', status: 'Selesai', target: '2026-11-03', catatan: '', photoName: '', photoDataUrl: '' },
+      { id: 3, tgl: '2026-11-02', kategori: 'Urgent', item: 'Perbaikan roling door', detail: 'Perbaikan Roling door Kering Pik', urgensi: 'High', oleh: 'Aghi Santoso', gudang: 'Gudang Kering', status: 'Selesai', target: '2026-11-06', catatan: '', photoName: '', photoDataUrl: '' },
+      { id: 4, tgl: '2026-11-09', kategori: 'Urgent', item: 'Perbaikan Talang Gudang E15', detail: 'Perbaikan Talang Gudang E15 , bocor saat hujan', urgensi: 'Medium', oleh: 'Aghi Santoso', gudang: 'Gudang Kering', status: 'In-Progress', target: '2026-11-09', catatan: '', photoName: '', photoDataUrl: '' },
+      { id: 5, tgl: '2026-11-09', kategori: 'Urgent', item: 'Ganti oli compresor No. 2', detail: 'Pergantian oli Compresor no. 2', urgensi: 'High', oleh: 'Aghi Santoso', gudang: 'Gudang Basah', status: 'Pengajuan', target: '2026-11-12', catatan: 'Teknisi masih ada perkerjaan di CK', photoName: '', photoDataUrl: '' },
+    ];
+
+    const CS_CHECKLIST = [
+      { no: 1, item: 'Cek Siklus Defrost Evaporator', freq: 'Mingguan' },
+      { no: 2, item: 'Pembersihan Evaporator & Coil', freq: 'Mingguan' },
+      { no: 3, item: 'Inspeksi Saluran Pembuangan (Drain Line)', freq: 'Mingguan' },
+      { no: 4, item: 'Sanitasi Dinding & Lantai Interior', freq: 'Mingguan' },
+      { no: 5, item: 'Cek Level Oli Compressor Sight Glass', freq: 'Mingguan' },
+      { no: 6, item: 'Pemeriksaan Kerataan Tirai & Engsel Pintu', freq: 'Bulanan' },
+      { no: 7, item: 'Pembersihan Kondensor (Outdoor Unit)', freq: 'Bulanan' },
+      { no: 8, item: 'Cek Level Refrigerant / Freon', freq: 'Bulanan' },
+      { no: 9, item: 'Inspeksi Sistem Kelistrikan', freq: 'Bulanan' },
+      { no: 10, item: 'Pemeriksaan Kipas Evaporator & Kondensor', freq: 'Bulanan' },
+      { no: 11, item: 'Inspeksi Panel Isolasi (PU Board)', freq: 'Bulanan' },
+      { no: 12, item: 'Penambahan Oli Compressor Cold Storage', freq: 'Kondisional / Bulanan' },
+      { no: 13, item: 'Pemeriksaan & Cek Ventilator CS', freq: 'Sebulan Sekali' },
+      { no: 14, item: 'Inspeksi Pipa Drain & Saluran Pembuangan', freq: 'Bulanan' },
+    ];
+
+    const GK_CHECKLIST = [
+      { no: 1, item: 'Pelumasan Roda & Bearing Hand Pallet', freq: 'Mingguan' },
+      { no: 2, item: 'Pembersihan & Pelumasan Rantai Hand Stacker', freq: 'Mingguan' },
+      { no: 3, item: 'Inspeksi Kebocoran Oli Hidrolik', freq: 'Mingguan' },
+      { no: 4, item: 'Pembersihan Roda Peralatan dari Benang/Kotoran', freq: 'Mingguan' },
+      { no: 5, item: 'Inspeksi Fisik Rak Gudang (Racking System)', freq: 'Mingguan' },
+      { no: 6, item: 'Pemeriksaan Fasilitas APAR & Safety Zone', freq: 'Mingguan' },
+      { no: 7, item: 'Perbaikan & Service Hand Pallet Gudang Kering', freq: 'Kondisional / Bulanan' },
+      { no: 8, item: 'Maintenance Hand Stacker Gudang Kering', freq: 'Bulanan' },
+      { no: 9, item: 'Penambahan / Penggantian Oli Hidrolik MHE', freq: 'Bulanan' },
+      { no: 10, item: 'Inspeksi Kelayakan Pallet Plastik', freq: 'Bulanan' },
+      { no: 11, item: 'Pemeriksaan Sistem Ventilator & Exhauster Gudang', freq: 'Sebulan Sekali' },
+      { no: 12, item: 'Inspeksi Baut & Anchor System Rak Gudang', freq: 'Bulanan' },
+      { no: 13, item: 'Pemeriksaan & Cek Filter Air Minum / Dispenser', freq: 'Bulanan' },
+      { no: 14, item: 'Pemeriksaan Mesin Repack', freq: 'Bulanan' },
+      { no: 15, item: 'Pemeriksaan Rolling Door', freq: 'Bulanan' },
+    ];
+
+    let records = [];
+    let checklistRecords = [];
+    let activeHistTab = 'pengajuan';
+    let gasUrl = '';
+    let pendingConfirmAction = null;
+
+    let currentPhotoDataUrl = '';
+    let currentPhotoName = '';
+    let chkPhotoDataUrl = '';
+    let chkPhotoName = '';
+    let activeStream = null;
+
+    function loadData() {
+      try {
+        gasUrl = localStorage.getItem(GAS_URL_KEY) || '';
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          records = parsed.records || [...INITIAL_RECORDS];
+          checklistRecords = parsed.checklistRecords || [];
+        } else {
+          records = [...INITIAL_RECORDS];
+        }
+      } catch (e) {
+        records = [...INITIAL_RECORDS];
+      }
+    }
+
+    function saveData() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ records, checklistRecords }));
+      } catch (e) {
+        showToast('Penyimpanan browser penuh, silakan ekspor Excel sekarang.', 'error');
+      }
+    }
+
+    function updateSyncIndicator(state, label) {
+      const dot = document.getElementById('syncStatusDot');
+      const txt = document.getElementById('syncStatusText');
+      const refBtn = document.getElementById('refreshCloudBtn');
+      if (gasUrl) {
+        refBtn.classList.remove('hidden');
+        if (state === 'syncing') {
+          dot.className = 'w-2 h-2 rounded-full bg-sky-400 animate-pulse';
+          txt.textContent = label || 'Menyinkronkan...';
+        } else if (state === 'error') {
+          dot.className = 'w-2 h-2 rounded-full bg-red-400';
+          txt.textContent = label || 'Gagal Sync Cloud';
+        } else {
+          dot.className = 'w-2 h-2 rounded-full bg-emerald-400';
+          txt.textContent = label || 'Terhubung Cloud';
+        }
+      } else {
+        refBtn.classList.add('hidden');
+        dot.className = 'w-2 h-2 rounded-full bg-amber-400';
+        txt.textContent = 'Atur Sync Tim';
+      }
+    }
+
+    async function cloudFetchAll(silent = false) {
+      if (!gasUrl) return;
+      updateSyncIndicator('syncing', 'Mengambil data...');
+      try {
+        const res = await fetch(gasUrl, { method: 'GET' });
+        const json = await res.json();
+        if (json && json.ok) {
+          if (Array.isArray(json.records) && json.records.length > 0) records = json.records;
+          if (Array.isArray(json.checklistRecords)) checklistRecords = json.checklistRecords;
+          saveData();
+          updateKpis();
+          renderRecords();
+          const jam = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+          updateSyncIndicator('ok', `Cloud Sync (${jam})`);
+          if (!silent) showToast('Data berhasil disinkronkan dari Google Sheets!');
+        } else {
+          throw new Error('Respon tidak valid');
+        }
+      } catch (err) {
+        updateSyncIndicator('error', 'Sync Gagal (Cek URL)');
+        if (!silent) showToast('Gagal mengambil data dari Google Sheets. Pastikan URL & izin Deploy sudah "Anyone".', 'error');
+      }
+    }
+
+    async function cloudPost(payload) {
+      if (!gasUrl) return;
+      updateSyncIndicator('syncing', 'Mengirim...');
+      try {
+        const res = await fetch(gasUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(payload),
+        });
+        const json = await res.json();
+        if (json && json.ok) {
+          const jam = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+          updateSyncIndicator('ok', `Cloud Sync (${jam})`);
+        } else {
+          throw new Error('Gagal simpan ke cloud');
+        }
+      } catch (err) {
+        updateSyncIndicator('error', 'Gagal Kirim Cloud');
+        showToast('Tersimpan lokal, tapi gagal kirim ke Google Sheets.', 'error');
+      }
+    }
+
+    function compressImageFile(file, callback) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 480;
+          let w = img.width;
+          let h = img.height;
+          if (w > maxDim || h > maxDim) {
+            if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+            else { w = Math.round((w * maxDim) / h); h = maxDim; }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          callback(canvas.toDataURL('image/jpeg', 0.65));
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function showToast(msg, type = 'success') {
+      const box = document.getElementById('toastBox');
+      box.textContent = msg;
+      box.className = 'rounded-xl px-4 py-3 text-sm font-medium shadow-sm border ' +
+        (type === 'error' ? 'bg-red-50 border-red-200 text-red-800' : 'bg-emerald-50 border-emerald-200 text-emerald-900');
+      box.classList.remove('hidden');
+      setTimeout(() => box.classList.add('hidden'), 4000);
+    }
+
+    function openConfirm(msg, onOk) {
+      document.getElementById('confirmMessage').textContent = msg;
+      document.getElementById('confirmPinInput').value = '';
+      document.getElementById('confirmPinError').classList.add('hidden');
+      pendingConfirmAction = onOk;
+      document.getElementById('confirmModal').classList.remove('hidden');
+    }
+
+    function updateKpis() {
+      document.getElementById('countBadge').textContent = String(records.length);
+      document.getElementById('kpiTotal').textContent = String(records.length);
+      document.getElementById('kpiProgress').textContent = String(records.filter((r) => r.status === 'In-Progress').length);
+      document.getElementById('kpiPengajuan').textContent = String(records.filter((r) => r.status === 'Pengajuan').length);
+      document.getElementById('kpiSelesai').textContent = String(records.filter((r) => r.status === 'Selesai').length);
+      document.getElementById('histCountP').textContent = String(records.length);
+      document.getElementById('histCountC').textContent = String(checklistRecords.length);
+    }
+
+    function switchTab(name) {
+      const panels = { pengajuan: 'panelPengajuan', checklist: 'panelChecklist', export: 'panelExport' };
+      const btns = { pengajuan: 'tabPengajuanBtn', checklist: 'tabChecklistBtn', export: 'tabExportBtn' };
+      Object.keys(panels).forEach((k) => {
+        document.getElementById(panels[k]).classList.toggle('hidden', k !== name);
+        document.getElementById(btns[k]).className = k === name
+          ? 'flex-1 py-3 px-3 text-xs sm:text-sm font-semibold border-b-2 border-[#1E3A5F] text-[#1E3A5F] bg-white flex items-center justify-center gap-1.5'
+          : 'flex-1 py-3 px-3 text-xs sm:text-sm font-medium text-slate-600 hover:bg-white/60 flex items-center justify-center gap-1.5';
+      });
+      if (name === 'export') renderRecords();
+      if (name === 'checklist') renderChecklist();
+    }
+
+    function switchHistSubTab(sub) {
+      activeHistTab = sub;
+      const map = { pengajuan: 'histTabPengajuan', checklist: 'histTabChecklist' };
+      Object.keys(map).forEach((k) => {
+        document.getElementById(map[k]).className = k === sub
+          ? 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#1E3A5F] text-white'
+          : 'px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-700';
+      });
+      renderRecords();
+    }
+
+    function escapeHtml(s) {
+      return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function makePhotoAndDeleteActions(photoDataUrl, photoName, id, onDelete) {
+      const right = document.createElement('div');
+      right.className = 'flex items-center gap-2 self-start sm:self-center shrink-0';
+      if (photoDataUrl) {
+        right.innerHTML = `<img src="${photoDataUrl}" class="w-12 h-12 object-cover rounded-lg border border-slate-300" alt="Foto" />`;
+        const a = document.createElement('a');
+        a.href = photoDataUrl;
+        a.download = photoName || `foto_${id}.jpg`;
+        a.className = 'px-2.5 py-1.5 rounded-lg bg-white border border-slate-300 text-xs font-medium hover:bg-slate-100';
+        a.textContent = 'Unduh';
+        right.appendChild(a);
+      }
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'px-2.5 py-1.5 rounded-lg border border-red-200 text-xs font-medium text-red-600 hover:bg-red-50';
+      delBtn.textContent = 'Hapus';
+      delBtn.addEventListener('click', onDelete);
+      right.appendChild(delBtn);
+      return right;
+    }
+
+    function renderRecords() {
+      const box = document.getElementById('recordsList');
+      box.innerHTML = '';
+
+      if (activeHistTab === 'pengajuan') {
+        if (records.length === 0) {
+          box.innerHTML = '<div class="py-8 text-center text-sm text-slate-500 border border-dashed border-slate-300 rounded-xl">Riwayat pengajuan kosong.</div>';
+          return;
+        }
+        records.forEach((r) => {
+          const div = document.createElement('div');
+          div.className = 'p-4 rounded-xl border border-slate-200 bg-slate-50 flex flex-col sm:flex-row justify-between gap-3';
+          const statusColor = r.status === 'Selesai' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : (r.status === 'Dibatalkan' ? 'bg-slate-200 text-slate-700 border-slate-300' : 'bg-amber-100 text-amber-800 border-amber-300');
+          div.innerHTML = `
+            <div class="space-y-1.5 text-xs sm:text-sm flex-1">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="font-bold text-[#1E3A5F]">${escapeHtml(r.item)}</span>
+                <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-200 text-slate-800">${escapeHtml(r.gudang)}</span>
+                <select data-status-id="${r.id}" class="px-2 py-0.5 rounded-full text-xs font-semibold border cursor-pointer ${statusColor}">
+                  ${['Pengajuan','Pending Approval','In-Progress','Selesai','Dibatalkan'].map(st => `<option value="${st}" ${r.status === st ? 'selected' : ''}>${st}</option>`).join('')}
+                </select>
+                <span class="text-xs text-slate-500">${escapeHtml(r.tgl)} • ${escapeHtml(r.urgensi)}</span>
+              </div>
+              <p class="text-slate-700">${escapeHtml(r.detail)}</p>
+              <p class="text-xs text-slate-500">Oleh: ${escapeHtml(r.oleh)}${r.target ? ' • Target: ' + escapeHtml(r.target) : ''}</p>
+              <div class="mt-2 p-3 rounded-lg bg-white border border-slate-200 space-y-2">
+                <p class="text-[11px] font-bold uppercase tracking-wide text-[#1E3A5F]">Realisasi Teknisi</p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div>
+                    <label class="block text-[11px] font-semibold text-slate-600 mb-0.5">Nama Teknisi</label>
+                    <input type="text" data-teknisi-id="${r.id}" value="${escapeHtml(r.teknisi || '')}" placeholder="Diisi oleh teknisi..." class="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white" />
+                  </div>
+                  <div>
+                    <label class="block text-[11px] font-semibold text-slate-600 mb-0.5">Tgl Realisasi</label>
+                    <input type="date" data-tgl-real-id="${r.id}" value="${escapeHtml(r.tglRealisasi || '')}" class="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white" />
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-[11px] font-semibold text-slate-600 mb-0.5">Catatan / Hasil Pekerjaan</label>
+                  <input type="text" data-note-id="${r.id}" value="${escapeHtml(r.catatan || '')}" placeholder="Catatan hasil perbaikan atau kendala..." class="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white" />
+                </div>
+                <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+                  <div class="flex items-center gap-2">
+                    <label class="cursor-pointer inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-slate-300 bg-slate-50 hover:bg-slate-100 text-[11px] font-medium text-slate-700">
+                      Pilih / Ambil Foto
+                      <input type="file" accept="image/*" capture="environment" data-real-photo-id="${r.id}" class="hidden" />
+                    </label>
+                    <button type="button" data-real-cam-id="${r.id}" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-[#1E3A5F] text-[#1E3A5F] hover:bg-slate-50 text-[11px] font-medium">Kamera Langsung</button>
+                    ${r.realisasiPhotoDataUrl ? `<img src="${r.realisasiPhotoDataUrl}" class="w-8 h-8 object-cover rounded border border-slate-300" alt="Hasil" /><a href="${r.realisasiPhotoDataUrl}" download="${escapeHtml(r.realisasiPhotoName || 'realisasi_' + r.id + '.jpg')}" class="text-[11px] text-[#1E3A5F] hover:underline font-medium">Unduh Hasil</a>` : `<span class="text-[11px] text-slate-400">Belum ada foto hasil</span>`}
+                  </div>
+                  <button type="button" data-save-note-id="${r.id}" class="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold">Simpan Realisasi</button>
+                </div>
+              </div>
+            </div>
+          `;
+          div.querySelector(`[data-status-id="${r.id}"]`).addEventListener('change', (e) => {
+            r.status = e.target.value;
+            saveData(); updateKpis(); renderRecords();
+            cloudPost({ action: 'upsert', type: 'pengajuan', item: r });
+            showToast(`Status "${r.item}" diubah ke ${r.status}.`);
+          });
+          div.querySelector(`[data-real-cam-id="${r.id}"]`).addEventListener('click', () => {
+            openLiveCameraFor((dataUrl, fileName) => {
+              r.realisasiPhotoDataUrl = dataUrl;
+              r.realisasiPhotoName = fileName;
+              saveData(); renderRecords();
+              cloudPost({ action: 'upsert', type: 'pengajuan', item: r });
+              showToast('Foto hasil realisasi berhasil diambil & disimpan!');
+            });
+          });
+          div.querySelector(`[data-real-photo-id="${r.id}"]`).addEventListener('change', (e) => {
+            const f = e.target.files && e.target.files[0];
+            if (!f) return;
+            compressImageFile(f, (dataUrl) => {
+              r.realisasiPhotoDataUrl = dataUrl;
+              r.realisasiPhotoName = f.name;
+              saveData(); renderRecords();
+              cloudPost({ action: 'upsert', type: 'pengajuan', item: r });
+              showToast('Foto realisasi teknisi disimpan.');
+            });
+          });
+          div.querySelector(`[data-save-note-id="${r.id}"]`).addEventListener('click', () => {
+            r.teknisi = div.querySelector(`[data-teknisi-id="${r.id}"]`).value.trim();
+            r.tglRealisasi = div.querySelector(`[data-tgl-real-id="${r.id}"]`).value;
+            r.catatan = div.querySelector(`[data-note-id="${r.id}"]`).value.trim();
+            saveData(); renderRecords();
+            cloudPost({ action: 'upsert', type: 'pengajuan', item: r });
+            showToast(`Realisasi teknisi untuk "${r.item}" disimpan.`);
+          });
+          div.appendChild(makePhotoAndDeleteActions(r.photoDataUrl, r.photoName, r.id, () => {
+            openConfirm(`Hapus pengajuan "${r.item}"?`, () => {
+              records = records.filter((x) => x.id !== r.id);
+              saveData(); updateKpis(); renderRecords();
+              cloudPost({ action: 'delete', type: 'pengajuan', id: r.id });
+              showToast('Item pengajuan dihapus.');
+            });
+          }));
+          box.appendChild(div);
+        });
+      } else if (activeHistTab === 'checklist') {
+        if (checklistRecords.length === 0) {
+          box.innerHTML = '<div class="py-8 text-center text-sm text-slate-500 border border-dashed border-slate-300 rounded-xl">Belum ada riwayat realisasi checklist mingguan.</div>';
+          return;
+        }
+        checklistRecords.forEach((c) => {
+          const div = document.createElement('div');
+          div.className = 'p-4 rounded-xl border border-slate-200 bg-slate-50 flex flex-col sm:flex-row justify-between gap-3';
+          div.innerHTML = `
+            <div class="space-y-1.5 text-xs sm:text-sm flex-1">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="font-bold text-[#1E3A5F]">${escapeHtml(c.item)}</span>
+                <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-200 text-slate-800">${escapeHtml(c.area)} • ${escapeHtml(c.week)}</span>
+                <span class="px-2 py-0.5 rounded-full text-xs font-semibold ${c.deviasi === 'Tepat Waktu' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}">${escapeHtml(c.deviasi)}</span>
+              </div>
+              <p class="text-xs text-slate-600">Jadwal (Plan): <strong>${escapeHtml(c.planRange || c.planDate)}</strong></p>
+              <div class="mt-2 p-3 rounded-lg bg-white border border-slate-200 space-y-2">
+                <p class="text-[11px] font-bold uppercase tracking-wide text-[#1E3A5F]">Realisasi Teknisi</p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div>
+                    <label class="block text-[11px] font-semibold text-slate-600 mb-0.5">PIC Teknisi</label>
+                    <input type="text" data-chk-pic-id="${c.id}" value="${escapeHtml(c.pic || '')}" placeholder="Nama teknisi..." class="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white" />
+                  </div>
+                  <div>
+                    <label class="block text-[11px] font-semibold text-slate-600 mb-0.5">Tgl Realisasi</label>
+                    <input type="date" data-chk-real-id="${c.id}" value="${escapeHtml(c.realisasiDate || '')}" class="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white" />
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-[11px] font-semibold text-slate-600 mb-0.5">Catatan / Hasil Pekerjaan</label>
+                  <input type="text" data-chk-note-id="${c.id}" value="${escapeHtml(c.catatan || '')}" placeholder="Catatan hasil pengecekan..." class="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white" />
+                </div>
+                <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <label class="cursor-pointer inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-slate-300 bg-slate-50 hover:bg-slate-100 text-[11px] font-medium text-slate-700">
+                      Upload / Ganti Foto
+                      <input type="file" accept="image/*" capture="environment" data-chk-photo-id="${c.id}" class="hidden" />
+                    </label>
+                    <button type="button" data-chk-cam-id="${c.id}" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-[#1E3A5F] text-[#1E3A5F] hover:bg-slate-50 text-[11px] font-medium">Kamera Langsung</button>
+                  </div>
+                  <button type="button" data-save-chk-id="${c.id}" class="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold">Simpan Realisasi</button>
+                </div>
+              </div>
+            </div>
+          `;
+          div.querySelector(`[data-chk-cam-id="${c.id}"]`).addEventListener('click', () => {
+            openLiveCameraFor((dataUrl, fileName) => {
+              c.photoDataUrl = dataUrl;
+              c.photoName = fileName;
+              saveData(); renderRecords();
+              cloudPost({ action: 'upsert', type: 'checklist', item: c });
+              showToast('Foto hasil checklist berhasil diambil & disimpan!');
+            });
+          });
+          div.querySelector(`[data-chk-photo-id="${c.id}"]`).addEventListener('change', (e) => {
+            const f = e.target.files && e.target.files[0];
+            if (!f) return;
+            compressImageFile(f, (dataUrl) => {
+              c.photoDataUrl = dataUrl;
+              c.photoName = f.name;
+              saveData(); renderRecords();
+              cloudPost({ action: 'upsert', type: 'checklist', item: c });
+              showToast('Foto realisasi checklist disimpan.');
+            });
+          });
+          div.querySelector(`[data-save-chk-id="${c.id}"]`).addEventListener('click', () => {
+            c.pic = div.querySelector(`[data-chk-pic-id="${c.id}"]`).value.trim();
+            c.realisasiDate = div.querySelector(`[data-chk-real-id="${c.id}"]`).value;
+            c.catatan = div.querySelector(`[data-chk-note-id="${c.id}"]`).value.trim();
+            const batasPlan = c.planEnd || c.planDate;
+            c.deviasi = c.realisasiDate && batasPlan && c.realisasiDate > batasPlan ? 'Meleset (Terlambat)' : 'Tepat Waktu';
+            saveData(); renderRecords();
+            cloudPost({ action: 'upsert', type: 'checklist', item: c });
+            showToast(`Realisasi "${c.item}" diperbarui.`);
+          });
+          div.appendChild(makePhotoAndDeleteActions(c.photoDataUrl, c.photoName, c.id, () => {
+            openConfirm(`Hapus checklist "${c.item}"?`, () => {
+              checklistRecords = checklistRecords.filter((x) => x.id !== c.id);
+              saveData(); updateKpis(); renderRecords();
+              cloudPost({ action: 'delete', type: 'checklist', id: c.id });
+              showToast('Item checklist dihapus.');
+            });
+          }));
+          box.appendChild(div);
+        });
+      }
+    }
+
+    function renderChecklist() {
+      const sel = document.getElementById('checklistSelector').value;
+      const chkForm = document.getElementById('checklistForm');
+      const box = document.getElementById('checklistItemsBox');
+      box.innerHTML = '';
+      chkForm.classList.remove('hidden');
+      const items = sel === 'cs' ? CS_CHECKLIST : GK_CHECKLIST;
+      items.forEach((obj) => {
+        const row = document.createElement('label');
+        row.className = 'flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer text-sm';
+        row.innerHTML = `
+          <span class="flex items-center gap-3">
+            <input type="checkbox" name="chkItem" value="${escapeHtml(obj.item)}" data-freq="${escapeHtml(obj.freq)}" class="w-4 h-4 accent-[#1E3A5F]" />
+            <span>${obj.no}. ${escapeHtml(obj.item)}</span>
+          </span>
+          <span class="text-xs text-slate-500 shrink-0">${escapeHtml(obj.freq)}</span>
+        `;
+        box.appendChild(row);
+      });
+    }
+
+    function setPhoto(dataUrl, name) {
+      currentPhotoDataUrl = dataUrl;
+      currentPhotoName = name;
+      document.getElementById('photoPreviewImg').src = dataUrl;
+      document.getElementById('photoNameLabel').textContent = name;
+      document.getElementById('photoPreviewBox').classList.remove('hidden');
+    }
+
+    function stopWebcam() {
+      if (activeStream) {
+        activeStream.getTracks().forEach((t) => t.stop());
+        activeStream = null;
+      }
+      document.getElementById('webcamContainer').classList.add('hidden');
+    }
+
+    let liveCamStream = null;
+    let liveCamCallback = null;
+
+    function closeLiveCamera() {
+      if (liveCamStream) {
+        liveCamStream.getTracks().forEach((t) => t.stop());
+        liveCamStream = null;
+      }
+      liveCamCallback = null;
+      document.getElementById('liveCamModal').classList.add('hidden');
+    }
+
+    async function openLiveCameraFor(onCaptured) {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        showToast('Kamera langsung tidak didukung di browser ini. Gunakan tombol Upload / Pilih Foto.', 'error');
+        return;
+      }
+      try {
+        liveCamStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        liveCamCallback = onCaptured;
+        document.getElementById('liveCamVideo').srcObject = liveCamStream;
+        document.getElementById('liveCamModal').classList.remove('hidden');
+      } catch (err) {
+        showToast('Izin kamera ditolak/tidak tersedia. Gunakan tombol Upload / Pilih Foto.', 'error');
+      }
+    }
+
+    document.getElementById('liveCamCloseBtn').addEventListener('click', closeLiveCamera);
+    document.getElementById('liveCamCaptureBtn').addEventListener('click', () => {
+      const v = document.getElementById('liveCamVideo');
+      const c = document.getElementById('liveCamCanvas');
+      const maxDim = 480;
+      let w = v.videoWidth || 640;
+      let h = v.videoHeight || 480;
+      if (w > maxDim || h > maxDim) {
+        if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+        else { w = Math.round((w * maxDim) / h); h = maxDim; }
+      }
+      c.width = w;
+      c.height = h;
+      c.getContext('2d').drawImage(v, 0, 0, w, h);
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+      const dataUrl = c.toDataURL('image/jpeg', 0.65);
+      const cb = liveCamCallback;
+      closeLiveCamera();
+      if (cb) cb(dataUrl, `hasil_${stamp}.jpg`);
+    });
+
+    document.getElementById('openChkWebcamBtn').addEventListener('click', () => {
+      openLiveCameraFor((dataUrl, fileName) => {
+        chkPhotoDataUrl = dataUrl;
+        chkPhotoName = fileName;
+        document.getElementById('chkPhotoLabel').textContent = fileName;
+        showToast('Foto checklist berhasil diambil!');
+      });
+    });
+
+    // Event Listeners
+    document.getElementById('tabPengajuanBtn').addEventListener('click', () => switchTab('pengajuan'));
+    document.getElementById('tabChecklistBtn').addEventListener('click', () => switchTab('checklist'));
+    document.getElementById('tabExportBtn').addEventListener('click', () => switchTab('export'));
+    document.getElementById('histTabPengajuan').addEventListener('click', () => switchHistSubTab('pengajuan'));
+    document.getElementById('histTabChecklist').addEventListener('click', () => switchHistSubTab('checklist'));
+    document.getElementById('checklistSelector').addEventListener('change', renderChecklist);
+
+    document.getElementById('refreshCloudBtn').addEventListener('click', () => cloudFetchAll(false));
+    document.getElementById('openSyncModalBtn').addEventListener('click', () => {
+      document.getElementById('gasUrlInput').value = gasUrl;
+      document.getElementById('syncModal').classList.remove('hidden');
+    });
+    document.getElementById('closeSyncModalBtn').addEventListener('click', () => {
+      document.getElementById('syncModal').classList.add('hidden');
+    });
+
+    document.getElementById('saveGasUrlBtn').addEventListener('click', () => {
+      const val = document.getElementById('gasUrlInput').value.trim();
+      if (!val || !val.startsWith('https://script.google.com/')) {
+        showToast('Masukkan URL Web App Apps Script yang valid (https://script.google.com/...).', 'error');
+        return;
+      }
+      gasUrl = val;
+      try { localStorage.setItem(GAS_URL_KEY, gasUrl); } catch (e) {}
+      document.getElementById('syncModal').classList.add('hidden');
+      cloudFetchAll(false);
+    });
+
+    document.getElementById('pushAllToCloudBtn').addEventListener('click', () => {
+      const val = document.getElementById('gasUrlInput').value.trim() || gasUrl;
+      if (!val) {
+        showToast('Isi URL Web App terlebih dahulu.', 'error');
+        return;
+      }
+      gasUrl = val;
+      try { localStorage.setItem(GAS_URL_KEY, gasUrl); } catch (e) {}
+      cloudPost({ action: 'pushAll', pengajuan: records, checklist: checklistRecords });
+      showToast('Seluruh data lokal sedang dikirim ke Google Sheets...');
+    });
+
+    document.getElementById('disconnectGasBtn').addEventListener('click', () => {
+      gasUrl = '';
+      try { localStorage.removeItem(GAS_URL_KEY); } catch (e) {}
+      document.getElementById('gasUrlInput').value = '';
+      updateSyncIndicator('local');
+      document.getElementById('syncModal').classList.add('hidden');
+      showToast('Koneksi Google Sheets diputus.');
+    });
+
+    document.getElementById('confirmCancelBtn').addEventListener('click', () => {
+      pendingConfirmAction = null;
+      document.getElementById('confirmModal').classList.add('hidden');
+    });
+    document.getElementById('confirmOkBtn').addEventListener('click', () => {
+      const entered = document.getElementById('confirmPinInput').value.trim();
+      const errEl = document.getElementById('confirmPinError');
+      if (entered !== adminPin) {
+        errEl.textContent = 'PIN salah! Anda tidak memiliki izin untuk menghapus data.';
+        errEl.classList.remove('hidden');
+        return;
+      }
+      document.getElementById('confirmModal').classList.add('hidden');
+      if (pendingConfirmAction) pendingConfirmAction();
+      pendingConfirmAction = null;
+    });
+
+    document.getElementById('saveAdminPinBtn').addEventListener('click', () => {
+      const val = document.getElementById('adminPinInput').value.trim();
+      if (!val || val.length < 4) {
+        showToast('PIN minimal 4 karakter.', 'error');
+        return;
+      }
+      adminPin = val;
+      try { localStorage.setItem(ADMIN_PIN_KEY, adminPin); } catch (e) {}
+      document.getElementById('adminPinInput').value = '';
+      showToast('PIN Izin Hapus berhasil diperbarui!');
+    });
+
+    document.getElementById('selectAllChkBtn').addEventListener('click', () => {
+      const boxes = document.querySelectorAll('input[name="chkItem"]');
+      const allChecked = Array.from(boxes).every((b) => b.checked);
+      boxes.forEach((b) => { b.checked = !allChecked; });
+    });
+
+    document.getElementById('cameraFileInput').addEventListener('change', (e) => {
+      const f = e.target.files && e.target.files[0];
+      if (!f) return;
+      compressImageFile(f, (dataUrl) => setPhoto(dataUrl, f.name));
+    });
+
+    document.getElementById('chkCameraInput').addEventListener('change', (e) => {
+      const f = e.target.files && e.target.files[0];
+      if (!f) return;
+      compressImageFile(f, (dataUrl) => {
+        chkPhotoDataUrl = dataUrl;
+        chkPhotoName = f.name;
+        document.getElementById('chkPhotoLabel').textContent = f.name;
+      });
+    });
+
+    document.getElementById('openWebcamBtn').addEventListener('click', async () => {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        showToast('Gunakan tombol "Ambil Foto / Pilih File" di perangkat ini.', 'error');
+        return;
+      }
+      try {
+        activeStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        document.getElementById('webcamVideo').srcObject = activeStream;
+        document.getElementById('webcamContainer').classList.remove('hidden');
+      } catch (err) {
+        showToast('Izin kamera ditolak/tidak tersedia. Gunakan tombol "Ambil Foto / Pilih File".', 'error');
+      }
+    });
+
+    document.getElementById('captureBtn').addEventListener('click', () => {
+      const v = document.getElementById('webcamVideo');
+      const c = document.getElementById('captureCanvas');
+      const maxDim = 480;
+      let w = v.videoWidth || 640;
+      let h = v.videoHeight || 480;
+      if (w > maxDim || h > maxDim) {
+        if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+        else { w = Math.round((w * maxDim) / h); h = maxDim; }
+      }
+      c.width = w;
+      c.height = h;
+      c.getContext('2d').drawImage(v, 0, 0, w, h);
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+      setPhoto(c.toDataURL('image/jpeg', 0.65), `warehouse_${stamp}.jpg`);
+      stopWebcam();
+    });
+
+    document.getElementById('closeWebcamBtn').addEventListener('click', stopWebcam);
+    document.getElementById('removePhotoBtn').addEventListener('click', () => {
+      currentPhotoDataUrl = '';
+      currentPhotoName = '';
+      document.getElementById('cameraFileInput').value = '';
+      document.getElementById('photoPreviewBox').classList.add('hidden');
+    });
+
+    document.getElementById('pengajuanForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const newRec = {
+        id: Date.now(),
+        tgl: document.getElementById('fTgl').value,
+        kategori: 'Urgent',
+        item: document.getElementById('fItem').value.trim(),
+        detail: document.getElementById('fDetail').value.trim(),
+        urgensi: document.getElementById('fUrgensi').value,
+        oleh: document.getElementById('fOleh').value.trim(),
+        gudang: document.getElementById('fGudang').value,
+        status: document.getElementById('fStatus').value,
+        target: document.getElementById('fTarget').value,
+        catatan: '',
+        teknisi: '',
+        tglRealisasi: '',
+        realisasiPhotoName: '',
+        realisasiPhotoDataUrl: '',
+        photoName: currentPhotoName,
+        photoDataUrl: currentPhotoDataUrl,
+      };
+      records.unshift(newRec);
+      saveData();
+      updateKpis();
+      cloudPost({ action: 'upsert', type: 'pengajuan', item: newRec });
+      e.target.reset();
+      document.getElementById('fTgl').value = new Date().toISOString().slice(0, 10);
+      document.getElementById('photoPreviewBox').classList.add('hidden');
+      currentPhotoDataUrl = '';
+      currentPhotoName = '';
+      showToast('Pengajuan maintenance berhasil disimpan!');
+    });
+
+    document.getElementById('checklistForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const checked = Array.from(document.querySelectorAll('input[name="chkItem"]:checked'));
+      if (checked.length === 0) {
+        showToast('Pilih minimal 1 item checklist yang sudah dikerjakan.', 'error');
+        return;
+      }
+      const area = document.getElementById('checklistSelector').value === 'cs' ? 'Cold Storage' : 'Gudang Kering';
+      const monthStr = document.getElementById('chkMonth').value;
+      const week = document.getElementById('chkWeek').value;
+      const weeks = getWeeksForMonth(monthStr);
+      const activeW = weeks.find((w) => w.name === week);
+      const planStart = document.getElementById('chkPlanStart').value;
+      const planEnd = (activeW && activeW.end) || planStart || '';
+      const planDate = planEnd || planStart || '';
+      const planRange = planStart && planEnd ? formatShortRange(planStart, planEnd) : planDate;
+      const realisasiDate = '';
+      const pic = document.getElementById('chkPic').value.trim();
+      const catatan = document.getElementById('chkCatatan').value.trim();
+      const deviasi = 'Menunggu Realisasi';
+
+      const newItems = [];
+      checked.forEach((el, idx) => {
+        const obj = {
+          id: Date.now() + idx,
+          area,
+          item: el.value,
+          frekuensi: el.dataset.freq || '',
+          week,
+          planStart,
+          planEnd,
+          planDate,
+          planRange,
+          realisasiDate,
+          deviasi,
+          pic,
+          catatan,
+          photoName: chkPhotoName,
+          photoDataUrl: chkPhotoDataUrl,
+        };
+        checklistRecords.unshift(obj);
+        newItems.push(obj);
+      });
+
+      saveData();
+      updateKpis();
+      cloudPost({ action: 'upsert', type: 'checklist', items: newItems });
+      checked.forEach((el) => { el.checked = false; });
+      chkPhotoDataUrl = '';
+      chkPhotoName = '';
+      document.getElementById('chkCameraInput').value = '';
+      document.getElementById('chkPhotoLabel').textContent = '';
+      showToast(`${checked.length} item checklist ${area} (${week}) tersimpan!`);
+    });
+
+    document.getElementById('clearHistoryBtn').addEventListener('click', () => {
+      const label = activeHistTab === 'pengajuan' ? 'Pengajuan' : 'Checklist Mingguan';
+      openConfirm(`Bersihkan seluruh riwayat pada tab ${label}?`, () => {
+        if (activeHistTab === 'pengajuan') records = [];
+        else checklistRecords = [];
+        saveData();
+        updateKpis();
+        renderRecords();
+        cloudPost({ action: 'clearType', type: activeHistTab });
+        showToast(`Riwayat ${label} berhasil dibersihkan.`);
+      });
+    });
+
+    document.getElementById('exportCsvBtn').addEventListener('click', () => {
+      if (records.length === 0 && checklistRecords.length === 0) {
+        showToast('Semua riwayat kosong, belum ada data untuk diekspor.', 'error');
+        return;
+      }
+      if (typeof XLSX === 'undefined') {
+        showToast('Library Excel belum termuat. Pastikan koneksi internet aktif lalu coba lagi.', 'error');
+        return;
+      }
+      const wb = XLSX.utils.book_new();
+
+      const rowsP = records.map((r, idx) => ({
+        'No': idx + 1,
+        'Tgl Pengajuan': r.tgl || '',
+        'Kategori Maintenance': r.kategori || '',
+        'Item / Area': r.item || '',
+        'Detail Masalah / Pekerjaan': r.detail || '',
+        'Urgensi': r.urgensi || '',
+        'Diajukan Oleh': r.oleh || '',
+        'Gudang': r.gudang || '',
+        'Status Progress': r.status || '',
+        'Target Selesai': r.target || '',
+        'Teknisi Pelaksana': r.teknisi || '',
+        'Tgl Realisasi': r.tglRealisasi || '',
+        'Catatan Progress / Kendala': r.catatan || '',
+        'Nama File Foto Pengajuan': r.photoName || '',
+        'Nama File Foto Realisasi': r.realisasiPhotoName || ''
+      }));
+      const wsP = XLSX.utils.json_to_sheet(rowsP.length ? rowsP : [{ 'Info': 'Belum ada data pengajuan' }]);
+      XLSX.utils.book_append_sheet(wb, wsP, 'Pengajuan & Maintenance');
+
+      const csRows = checklistRecords.filter((c) => c.area === 'Cold Storage').map((c, idx) => ({
+        'No': idx + 1,
+        'Item Pekerjaan': c.item,
+        'Frekuensi': c.frekuensi,
+        'Week': c.week,
+        'Jadwal (Plan)': c.planDate,
+        'Realisasi (Tgl Dikerjakan)': c.realisasiDate,
+        'Status Deviasi': c.deviasi,
+        'PIC': c.pic,
+        'Catatan': c.catatan || '',
+        'Nama File Foto': c.photoName || ''
+      }));
+      const wsCS = XLSX.utils.json_to_sheet(csRows.length ? csRows : [{ 'Info': 'Belum ada realisasi Cold Storage' }]);
+      XLSX.utils.book_append_sheet(wb, wsCS, 'Checklist Cold Storage');
+
+      const gkRows = checklistRecords.filter((c) => c.area === 'Gudang Kering').map((c, idx) => ({
+        'No': idx + 1,
+        'Item Pekerjaan': c.item,
+        'Frekuensi': c.frekuensi,
+        'Week': c.week,
+        'Jadwal (Plan)': c.planDate,
+        'Realisasi (Tgl Dikerjakan)': c.realisasiDate,
+        'Status Deviasi': c.deviasi,
+        'PIC': c.pic,
+        'Catatan': c.catatan || '',
+        'Nama File Foto': c.photoName || ''
+      }));
+      const wsGK = XLSX.utils.json_to_sheet(gkRows.length ? gkRows : [{ 'Info': 'Belum ada realisasi Gudang Kering' }]);
+      XLSX.utils.book_append_sheet(wb, wsGK, 'Checklist Gudang Kering');
+
+      const filename = `Warehouse_Maintenance_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      XLSX.writeFile(wb, filename);
+      showToast(`File Excel multi-sheet (${filename}) berhasil diunduh!`);
+    });
+
+    loadData();
+    updateKpis();
+    updateSyncIndicator(gasUrl ? 'ok' : 'local');
+    const todayStr = new Date().toISOString().slice(0, 10);
+    document.getElementById('fTgl').value = todayStr;
+    document.getElementById('chkMonth').value = todayStr.slice(0, 7);
+    renderWeekOptions(false);
+    document.getElementById('chkMonth').addEventListener('change', () => renderWeekOptions(false));
+    document.getElementById('chkWeek').addEventListener('change', () => {
+      const weeks = getWeeksForMonth(document.getElementById('chkMonth').value);
+      const active = weeks.find((w) => w.name === document.getElementById('chkWeek').value);
+      if (active) {
+        document.getElementById('chkPlanStart').value = active.start;
+      }
+    });
+    document.getElementById('chkPlanStart').addEventListener('change', saveEditedWeekPlan);
+    if (gasUrl) cloudFetchAll(true);
+    if (window.lucide) lucide.createIcons();
+  </script>
+</body>
+</html>
